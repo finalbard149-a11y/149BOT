@@ -32,35 +32,53 @@ SYSTEM_PROMPT = """你是一位專業、嚴謹且細心的行政秘書與文字�
    - 清晰標註：「原文字句」與「建議修正」，並簡要說明修改原因。
 4. 語氣保持專業、精簡、直接，直接輸出整理成果或校對清單，避免冗長無意義的寒暄客套。"""
 
+user_context = {}
+MAX_HISTORY = 10 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_context[chat_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    
     welcome_text = (
-        "您好！我是您的專屬文字整理秘書。\n\n"
+        "您好！我是您的專屬文字整理秘書。\n"
+        "（已重置您的對話記憶）\n\n"
         "您可以直接將以下內容傳給我：\n"
-        "1. **戰備/提報單文字**：自動整理結構並規範用詞（如機動戰備、代值）。\n"
-        "2. **待校對文章或報告**：為您核對錯字、潤飾文句並檢查繁體用語。"
+        "1. **戰備/提報單文字**\n"
+        "2. **待校對文章或報告**"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
+    chat_id = update.effective_chat.id
+    
     if not user_text:
         return
 
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+
+    if chat_id not in user_context:
+        user_context[chat_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    user_context[chat_id].append({"role": "user", "content": user_text})
+
+    if len(user_context[chat_id]) > MAX_HISTORY + 1:
+        user_context[chat_id] = [user_context[chat_id][0]] + user_context[chat_id][-MAX_HISTORY:]
 
     try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_text}
-            ],
+            messages=user_context[chat_id],
             temperature=0.3
         )
         reply = response.choices[0].message.content
+        
+        user_context[chat_id].append({"role": "assistant", "content": reply})
+        
     except Exception as e:
         logging.error(f"API Error: {e}")
         reply = f"處理時發生錯誤，請稍後再試。\n錯誤訊息：{e}"
+        user_context[chat_id].pop() 
 
     await update.message.reply_text(reply)
 
