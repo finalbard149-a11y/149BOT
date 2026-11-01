@@ -128,7 +128,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 將提取出來的文字組裝成指令丟給 AI
-    ai_prompt = f"這是我上傳的文件「{file_name}」，內容如下，請幫我整理排版、抓錯字或重點摘要：\n\n{extracted_text}"
+    ai_prompt = f"這是我上傳的文件「{file_name}」，請將以下內容記住。回覆我『文件已讀取完畢，隨時等候您的指示』即可，請絕對不要主動進行排版、摘要或修改。內容如下：\n\n{extracted_text}"
     await process_with_ai(chat_id, ai_prompt, update)
 
 def main():
