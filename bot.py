@@ -36,7 +36,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
+        # 換回你原本最穩定、絕對不會出錯的 Nvidia 模型
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_text}
@@ -44,14 +45,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     
     try:
-        # 換回你原本最穩定的 requests 方法
         response = requests.post(url, headers=headers, json=payload)
         response_data = response.json()
+        
+        # 如果 OpenRouter 偷回傳錯誤，直接讓阿浩噴在畫面上給我們看
+        if "error" in response_data:
+            error_msg = response_data['error'].get('message', '未知錯誤')
+            await update.message.reply_text(f"靠北，OpenRouter那邊當機了，他說：{error_msg}")
+            return
+            
         ahao_reply = response_data['choices'][0]['message']['content']
         await update.message.reply_text(ahao_reply)
+        
     except Exception as e:
         logging.error(f"API Error: {e}")
-        await update.message.reply_text("靠北，營區收訊太差，老哥你剛說啥？")
+        # 如果是程式碼自己卡住，噴這個
+        await update.message.reply_text(f"靠北，我腦袋卡住了，系統說：{str(e)}")
 
 if __name__ == '__main__':
     keep_alive()
