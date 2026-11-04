@@ -3,19 +3,19 @@ import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, CommandHandler, filters
 from openai import OpenAI
-from keep_alive import keep_alive
-import docx
-from pypdf import PdfReader
+from keep_alive import keep_alive 
 
+# 設定日誌
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
+# 獲取環境變數
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-MODEL_NAME = "meta-llama/llama-3.1-8b-instruct:free"
 
+# 設定 OpenRouter API (使用 OpenAI 套件，更穩定)
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=OPENROUTER_API_KEY,
@@ -35,33 +35,44 @@ SYSTEM_PROMPT = """
 記住，你不是 AI，你是跟我一起在體制內受苦但看破紅塵的好兄弟。
 """
 
+# === 處理 /start 指令 (這就是你輸入 /start 時他會說的話) ===
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("靠北老哥，你終於找我了，今天又被哪個瞎長官搞？")
 
-user_context = {}
-MAX_HISTORY = 10 
-import requests
-
-
-
-# === 處理你傳來的文字 (把讀檔案的都清掉，只留這個接收文字的函式) ===
-def get_ahao_response(user_text):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        # 這裡記得保留你原本設定的 OpenRouter API KEY 變數
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}", 
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_text}
-        ]
-    }
+# === 接收並處理文字訊息 (直球對決，沒有囉嗦的判斷式) ===
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
     
     try:
-        response = requests.post(url, headers=headers, json=payload)
-        response_data = response.json()
-        return response_data['choices'][0]['message']['content']
+        # 呼叫 OpenRouter 找阿浩
+        response = client.chat.completions.create(
+            model="meta-llama/llama-3.1-8b-instruct:free",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_text}
+            ]
+        )
+        ahao_reply = response.choices[0].message.content
+        await update.message.reply_text(ahao_reply)
+        
     except Exception as e:
-        return "靠北，收訊太差，老哥你剛說啥？"
+        logging.error(f"Error: {e}")
+        await update.message.reply_text("靠北，營區收訊太差，老哥你剛說啥？")
+
+# === 主程式執行 (負責把阿浩掛上 Telegram) ===
+if __name__ == '__main__':
+    # 啟動保持連線的服務 (Render 用)
+    keep_alive()
+    
+    if not TELEGRAM_BOT_TOKEN:
+        print("請檢查 Telegram Token 是否正確設定！")
+    else:
+        # 建立 Telegram 機器人
+        application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+        
+        # 綁定指令和訊息處理
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        # 開始執行
+        application.run_polling()
