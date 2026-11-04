@@ -56,7 +56,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 組合這次要傳給大腦的完整對話（靈魂設定 + 歷史記憶）
     messages_to_send = [{"role": "system", "content": SYSTEM_PROMPT}] + user_memory[chat_id]
 
-    url = "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)"
+    url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}", 
         "Content-Type": "application/json"
